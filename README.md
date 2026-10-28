@@ -8,6 +8,10 @@ Windows media controls (browsers, Spotify, players), and has deep extra integrat
 
 > 💡 This is my first app. I'm not a programmer by training — I built it entirely through **vibe coding**.
 
+![Now Playing widget with the mixer and the output device list open](docs/widget-mixer.png)
+
+*The player with the built-in mixer (master and per-app volume) and the output device switcher.*
+
 ## Features
 
 - **Player:** cover art, blurred background from the cover, seek bar, ⏮ ⏯ ⏭.
@@ -86,6 +90,10 @@ This builds `NowPlaying.exe` and packs it with the icon and the extension into `
 Spotify, плееры), а с **SoundCloud** интегрирован особенно глубоко.
 
 > 💡 Это моё первое приложение. Программированию я специально не учился — сделал его целиком через **вайбкодинг**.
+
+![Виджет «Сейчас играет» с раскрытым микшером и списком устройств вывода](docs/widget-mixer.png)
+
+*Плеер со встроенным микшером (общая громкость и громкость каждого приложения) и выбором устройства вывода звука.*
 
 ## Возможности
 
