@@ -48,17 +48,24 @@ function run(command) {
   if (button) button.click();
 }
 
+// Ответ фоновой части ждём не дольше 3 с: если Opera усыпила её посреди запроса, ответ не придёт никогда,
+// и без этого ограничения отчёты остановились бы до перезагрузки страницы.
+function withTimeout(promise, ms) {
+  return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
+}
+
 async function tick() {
-  const state = readState();
-  if (state) {
-    try {
-      const answer = await chrome.runtime.sendMessage({ type: 'state', state });
+  try {
+    const state = readState();
+    if (state) {
+      const answer = await withTimeout(chrome.runtime.sendMessage({ type: 'state', state }), 3000);
       ((answer && answer.commands) || []).forEach(run);
-    } catch (e) {
-      // расширение перезагрузили — эта вкладка ожидает обновления страницы
     }
+  } catch (e) {
+    // нет ответа или расширение перезагрузили (тогда вкладка ждёт обновления страницы) — пробуем снова
+  } finally {
+    setTimeout(tick, POLL_MS);
   }
-  setTimeout(tick, POLL_MS);
 }
 
 tick();
