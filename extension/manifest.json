@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_name__",
+  "version": "1.4",
+  "description": "__MSG_description__",
+  "default_locale": "en",
+  "host_permissions": ["http://127.0.0.1:48251/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://soundcloud.com/*"],
+      "js": ["page.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://soundcloud.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": { "128": "icon128.png" }
+}

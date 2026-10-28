@@ -1,0 +1,4 @@
+{
+  "name": { "message": "SoundCloud → Now Playing widget" },
+  "description": { "message": "Sends repeat, shuffle, like, volume and the current track from SoundCloud to the Now Playing widget and controls them." }
+}

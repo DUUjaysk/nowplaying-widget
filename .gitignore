@@ -1,0 +1,13 @@
+# собранные файлы
+release/
+installer/staging/
+*.exe
+
+# вспомогательные утилиты для проверок (не входят в программу)
+Probe.cs
+FakePlayer.cs
+PauseAll.cs
+
+# личные данные, если когда-нибудь окажутся рядом
+listens.jsonl
+soundcloud-stats.html
