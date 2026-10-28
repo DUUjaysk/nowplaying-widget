@@ -40,8 +40,10 @@ Browsers don't tell Windows about repeat, shuffle and likes, so a tiny extension
 
 1. Open `opera://extensions` (Opera / Opera GX) or `chrome://extensions` (Chrome, Edge: `edge://extensions`).
 2. Turn on **Developer mode** → **Load unpacked**.
-3. Choose the folder `%LOCALAPPDATA%\Programs\NowPlaying\soundcloud-extension`
-   (tray icon menu → *SoundCloud extension (folder)* opens it).
+3. Choose the folder `%LOCALAPPDATA%\Programs\NowPlaying\soundcloud-extension` — the installer always puts the
+   extension there (for user *Alex* it is `C:\Users\Alex\AppData\Local\Programs\NowPlaying\soundcloud-extension`).
+   `AppData` is hidden, so the easiest way is to paste the path above into the address bar of the folder dialog and press Enter.
+   The tray icon menu → *SoundCloud extension (folder)* also opens it.
 4. Reload the SoundCloud tab (F5).
 
 The extension only talks to the widget on your own computer (`http://127.0.0.1:48251`). Nothing is sent anywhere else.
@@ -123,8 +125,10 @@ Spotify, плееры), а с **SoundCloud** интегрирован особе
 
 1. Открой `opera://extensions` (Opera / Opera GX) или `chrome://extensions` (Chrome; в Edge — `edge://extensions`).
 2. Включи **«Режим разработчика»** → **«Загрузить распакованное»**.
-3. Выбери папку `%LOCALAPPDATA%\Programs\NowPlaying\soundcloud-extension`
-   (её открывает пункт меню значка в трее «Расширение для SoundCloud (папка)»).
+3. Выбери папку `%LOCALAPPDATA%\Programs\NowPlaying\soundcloud-extension` — установщик всегда кладёт расширение туда
+   (у пользователя *Alex* это `C:\Users\Alex\AppData\Local\Programs\NowPlaying\soundcloud-extension`).
+   Папка `AppData` скрытая, поэтому проще всего вставить путь выше в адресную строку окна выбора папки и нажать Enter.
+   Ещё её открывает пункт меню значка в трее «Расширение для SoundCloud (папка)».
 4. Обнови вкладку SoundCloud (F5).
 
 Расширение общается только с виджетом на твоём же компьютере (`http://127.0.0.1:48251`) и никуда ничего не отправляет.
