@@ -122,16 +122,16 @@ namespace NowPlaying
             body.Children.Add(Step(2, L.T("Включи «Режим разработчика»", "Turn on Developer mode"),
                 L.T("Переключатель вверху справа страницы расширений (в Opera — тоже вверху справа).", "The switch in the top-right corner of the extensions page."), null));
 
-            // шаг 3 — загрузить распакованное
+            // шаг 3 — загрузить распакованное: одна кнопка и точные клавиши (перетаскивать папку не нужно —
+            // в окне выбора это превращается в копирование «папки в саму себя»)
             var s3 = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
             s3.Children.Add(Button(L.T("Скопировать путь к папке", "Copy folder path"), () =>
             {
-                try { Clipboard.SetText(Folder); Flash(L.T("Путь скопирован — вставь его в окне выбора папки (Ctrl+V) и нажми Enter.", "Path copied — paste it into the folder dialog (Ctrl+V) and press Enter.")); } catch { }
+                try { Clipboard.SetText(Folder); Flash(L.T("Скопировано. Теперь «Загрузить распакованное» → Ctrl+L → Ctrl+V → Enter → «Выбор папки».", "Copied. Now “Load unpacked” → Ctrl+L → Ctrl+V → Enter → “Select Folder”.")); } catch { }
             }));
-            // папку показываем снаружи и выделенной: видно, какую именно выбрать в «Загрузить распакованное»
-            s3.Children.Add(Button(L.T("Показать папку", "Show folder"), () => { try { Process.Start("explorer.exe", "/select,\"" + Folder + "\""); } catch { } }));
-            body.Children.Add(Step(3, L.T("Нажми «Загрузить распакованное» и выбери папку", "Click “Load unpacked” and choose the folder"),
-                Folder, s3));
+            body.Children.Add(Step(3, L.T("Добавь расширение", "Add the extension"),
+                L.T("Скопируй путь, нажми «Загрузить распакованное», в окне выбора нажми Ctrl+L, Ctrl+V, Enter и «Выбор папки». Ничего не перетаскивай.",
+                    "Copy the path, click “Load unpacked”, then in the folder dialog press Ctrl+L, Ctrl+V, Enter and “Select Folder”. Don't drag anything."), s3));
 
             // шаг 4 — обновить вкладку
             body.Children.Add(Step(4, L.T("Обнови вкладку SoundCloud (F5) и включи трек", "Reload the SoundCloud tab (F5) and play a track"),
