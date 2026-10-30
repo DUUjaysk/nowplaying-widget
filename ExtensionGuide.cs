@@ -40,14 +40,15 @@ namespace NowPlaying
             {
                 new[] { "Opera GX", "opera://extensions", Path.Combine(pf, @"Opera GX\opera.exe"), Path.Combine(pf, @"Opera GX\launcher.exe"), Path.Combine(local, @"Programs\Opera GX\opera.exe"), Path.Combine(local, @"Programs\Opera GX\launcher.exe"), Path.Combine(pf86, @"Opera GX\opera.exe") },
                 new[] { "Opera", "opera://extensions", Path.Combine(pf, @"Opera\opera.exe"), Path.Combine(pf, @"Opera\launcher.exe"), Path.Combine(local, @"Programs\Opera\opera.exe"), Path.Combine(local, @"Programs\Opera\launcher.exe"), Path.Combine(pf86, @"Opera\opera.exe") },
-                new[] { "Chrome", "chrome://extensions", Path.Combine(pf, @"Google\Chrome\Application\chrome.exe"), Path.Combine(pf86, @"Google\Chrome\Application\chrome.exe"), Path.Combine(local, @"Google\Chrome\Application\chrome.exe") },
+                new[] { "Google Chrome", "chrome://extensions", Path.Combine(pf, @"Google\Chrome\Application\chrome.exe"), Path.Combine(pf86, @"Google\Chrome\Application\chrome.exe"), Path.Combine(local, @"Google\Chrome\Application\chrome.exe") },
                 new[] { "Edge", "edge://extensions", Path.Combine(pf86, @"Microsoft\Edge\Application\msedge.exe"), Path.Combine(pf, @"Microsoft\Edge\Application\msedge.exe") },
             };
+            // найденные браузеры; Chrome показываем всегда — он самый частый (если не найден, exe будет пустым)
             var found = new List<string[]>();
             foreach (var b in known)
             {
                 var exe = b.Skip(2).FirstOrDefault(File.Exists);
-                if (exe != null) found.Add(new[] { b[0], exe, b[1] });
+                if (exe != null || b[0] == "Google Chrome") found.Add(new[] { b[0], exe ?? "", b[1] });
             }
             return found;
         }
@@ -100,16 +101,22 @@ namespace NowPlaying
 
             // шаг 1 — страница расширений в браузере
             var browsers = Browsers();
-            var s1 = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
+            // Браузеры не дают открыть свою внутреннюю страницу по команде извне (адрес уходит в поиск),
+            // поэтому кнопка копирует адрес и открывает браузер, а подсказка говорит, куда его вставить.
+            var s1 = new StackPanel();
+            var buttons = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
+            hint1 = new TextBlock { Foreground = Ui.Brush(0xFF30D158), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0), Visibility = Visibility.Collapsed };
             foreach (var b in browsers)
             {
                 var name = b[0]; var exe = b[1]; var url = b[2];
-                s1.Children.Add(Button(L.T("Открыть в ", "Open in ") + name, () => OpenExtensionsPage(exe, url)));
+                buttons.Children.Add(Button(name, () => OpenExtensionsPage(name, exe, url)));
             }
+            s1.Children.Add(buttons);
+            s1.Children.Add(hint1);
             body.Children.Add(Step(1, L.T("Открой страницу расширений браузера", "Open your browser's extensions page"),
-                browsers.Count > 0 ? L.T("Или вставь в адресную строку: opera://extensions, chrome://extensions или edge://extensions.", "Or type into the address bar: opera://extensions, chrome://extensions or edge://extensions.")
-                                   : L.T("Вставь в адресную строку: opera://extensions (Opera), chrome://extensions (Chrome) или edge://extensions (Edge).", "Type into the address bar: opera://extensions (Opera), chrome://extensions (Chrome) or edge://extensions (Edge)."),
-                browsers.Count > 0 ? s1 : null));
+                L.T("Нажми на свой браузер: адрес страницы скопируется, а браузер откроется. Останется вставить адрес в адресную строку.",
+                    "Click your browser: the page address is copied and the browser opens. Then just paste the address into the address bar."),
+                s1));
 
             // шаг 2 — режим разработчика
             body.Children.Add(Step(2, L.T("Включи «Режим разработчика»", "Turn on Developer mode"),
@@ -152,10 +159,18 @@ namespace NowPlaying
                                  : L.T("Расширение ещё не подключено", "The extension is not connected yet");
         }
 
-        static void OpenExtensionsPage(string exe, string url)
+        TextBlock hint1;
+
+        void OpenExtensionsPage(string name, string exe, string url)
         {
-            try { Process.Start(exe, url); } catch { }
-            try { Clipboard.SetText(url); } catch { }    // если браузер не откроет внутреннюю страницу сам — адрес уже в буфере
+            try { Clipboard.SetText(url); } catch { }
+            bool started = false;
+            if (exe.Length > 0) { try { Process.Start(exe); started = true; } catch { } }
+            hint1.Text = started
+                ? L.T("Адрес " + url + " скопирован. В " + name + " нажми Ctrl+L, потом Ctrl+V и Enter.", "Address " + url + " copied. In " + name + " press Ctrl+L, then Ctrl+V and Enter.")
+                : L.T(name + " не нашёлся на компьютере. Адрес " + url + " скопирован — открой браузер сам и вставь его в адресную строку (Ctrl+L, Ctrl+V, Enter).",
+                      name + " was not found. Address " + url + " copied — open the browser yourself and paste it into the address bar (Ctrl+L, Ctrl+V, Enter).");
+            hint1.Visibility = Visibility.Visible;
         }
 
         UIElement Step(int n, string title, string hint, UIElement extra)
