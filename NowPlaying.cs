@@ -124,6 +124,23 @@ namespace NowPlaying
             };
         }
 
+        // Рабочая область того монитора, где сейчас стоит окно (без панели задач), в единицах WPF.
+        // SystemParameters.WorkArea — только основной монитор: с ним виджет со второго монитора
+        // при любом изменении размера (например, от звука уведомления) прыгал на основной.
+        public static Rect WorkAreaOf(Window w)
+        {
+            try
+            {
+                var hwnd = new System.Windows.Interop.WindowInteropHelper(w).Handle;
+                var source = PresentationSource.FromVisual(w);
+                if (hwnd == IntPtr.Zero || source == null || source.CompositionTarget == null) return SystemParameters.WorkArea;
+                var px = System.Windows.Forms.Screen.FromHandle(hwnd).WorkingArea;
+                var m = source.CompositionTarget.TransformFromDevice;
+                return new Rect(m.Transform(new Point(px.Left, px.Top)), m.Transform(new Point(px.Right, px.Bottom)));
+            }
+            catch { return SystemParameters.WorkArea; }
+        }
+
         public static string Time(TimeSpan t)
         {
             if (t < TimeSpan.Zero) t = TimeSpan.Zero;
@@ -1526,10 +1543,10 @@ namespace NowPlaying
             zoom.ScaleX = zoom.ScaleY = scale;
         }
 
-        // После изменения размера возвращаем виджет на экран (прозрачные поля по краям — 18 px).
+        // После изменения размера возвращаем виджет на экран — тот монитор, где он стоит (прозрачные поля по краям — 18 px).
         void KeepOnScreen()
         {
-            var area = SystemParameters.WorkArea;
+            var area = Ui.WorkAreaOf(this);
             double margin = 18 * scale;
             if (Left + ActualWidth - margin > area.Right) Left = area.Right - ActualWidth + margin;
             if (Top + ActualHeight - margin > area.Bottom) Top = area.Bottom - ActualHeight + margin;

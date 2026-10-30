@@ -613,7 +613,7 @@ namespace NowPlaying
         void KeepDetachedOnScreen()
         {
             var w = detachedWindow;
-            var area = SystemParameters.WorkArea;
+            var area = Ui.WorkAreaOf(w);           // монитор, где стоит микшер, а не только основной
             double m = 18 * dScale;
             if (w.Left + w.ActualWidth - m > area.Right) w.Left = area.Right - w.ActualWidth + m;
             if (w.Top + w.ActualHeight - m > area.Bottom) w.Top = area.Bottom - w.ActualHeight + m;
@@ -639,7 +639,7 @@ namespace NowPlaying
                 // первый раз — сразу под плеером; ждём, пока плеер нарисуется и узнает свою высоту
                 owner.Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    var area = SystemParameters.WorkArea;
+                    var area = Ui.WorkAreaOf(owner);
                     detachedWindow.Left = owner.Left;
                     detachedWindow.Top = Math.Min(owner.Top + owner.ActualHeight - 30, area.Bottom - detachedWindow.ActualHeight + 18);
                     Save();
