@@ -25,7 +25,7 @@ namespace NowPlayingSetup
     {
         public static string Name { get { return L.T("Сейчас играет", "Now Playing"); } }
         public static readonly string[] AllNames = { "Сейчас играет", "Now Playing" };   // ярлыки на обоих языках
-        public const string Version = "1.3";
+        public const string Version = "1.4";
         public const string Publisher = "DUUjaysk";
         public const string ExeName = "NowPlaying.exe";
         public const string ProcessName = "NowPlaying";

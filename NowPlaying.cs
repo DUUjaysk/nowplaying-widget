@@ -627,6 +627,12 @@ namespace NowPlaying
         readonly TextBlock lockGlyph;
         readonly Border menuPanel;
         readonly SeekBar blurBar;
+        TextBlock autoCheck;                       // галочка «Запускать вместе с Windows» в «Настройках»
+        Forms.ToolStripMenuItem autoItem;          // тот же пункт в меню трея
+        System.Windows.Controls.Primitives.Popup settingsPopup;   // «Настройки» — окошко справа от меню «⋯»
+        DateTime settingsClosedAt;
+        double topBeforeMixer = double.NaN;        // где был плеер до раскрытия микшера (NaN — не запомнено)
+        double pendingTop = double.NaN;            // куда вернуть плеер, когда окно уменьшится после сворачивания
         readonly TextBlock blurText;
         readonly BlurEffect blur = new BlurEffect { Radius = 70, RenderingBias = RenderingBias.Performance };
         const double MaxBlur = 120;
@@ -795,7 +801,17 @@ namespace NowPlaying
             grip.DragStarted += () => dragStartScale = scale;
             grip.Dragged += f => ApplyScale(dragStartScale * f);
             grip.DragFinished += () => { KeepOnScreen(); SavePosition(); };
-            SizeChanged += delegate { if (Mouse.LeftButton != MouseButtonState.Pressed) KeepOnScreen(); };
+            SizeChanged += (s, e) =>
+            {
+                // микшер свернули и окно уменьшилось — плеер возвращается туда, где был до раскрытия
+                if (!double.IsNaN(pendingTop) && e.HeightChanged && e.NewSize.Height < e.PreviousSize.Height)
+                {
+                    Top = pendingTop;
+                    pendingTop = double.NaN;
+                    SavePosition();
+                }
+                if (Mouse.LeftButton != MouseButtonState.Pressed) KeepOnScreen();
+            };
             card.Children.Add(grip);
 
             // Меню «⋯»: ползунок размытия фона и кнопка «Закрыть виджет».
@@ -844,6 +860,51 @@ namespace NowPlaying
             };
             menuStack.Children.Add(hideRow);
 
+            // «Настройки»: раскрывающийся раздел — автозапуск и удаление с компьютера
+            var settingsChevron = Ui.Glyph("", 9, Ui.Faint);
+            var settingsRow = MenuRow("", L.T("Настройки", "Settings"), Brushes.White, settingsChevron);
+            // сам раздел — отдельная карточка справа от меню, в том же «тёмном стекле»
+            var settingsBox = new StackPanel();
+            var settingsCard = new Border
+            {
+                Width = 230, Background = Ui.Brush(0xE61C1C20), BorderBrush = Glass.Edge, BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(16), Padding = new Thickness(14, 10, 14, 8), Child = settingsBox
+            };
+            settingsCard.MouseLeftButtonDown += (s, e) => e.Handled = true;
+            settingsPopup = new System.Windows.Controls.Primitives.Popup
+            {
+                PlacementTarget = settingsRow, Placement = System.Windows.Controls.Primitives.PlacementMode.Right,
+                HorizontalOffset = 22, VerticalOffset = -10, AllowsTransparency = true, StaysOpen = false, Child = settingsCard
+            };
+            settingsPopup.Closed += delegate { settingsChevron.Text = ""; settingsClosedAt = DateTime.Now; };
+            settingsBox.Children.Add(new TextBlock { Text = L.T("Настройки", "Settings"), Foreground = Ui.Faint, FontSize = 11, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 6) });
+            settingsRow.MouseLeftButtonUp += (s, e) =>
+            {
+                e.Handled = true;
+                // клик по строке при открытом окне сначала закрывает его (StaysOpen = false) — не открываем заново
+                if (settingsPopup.IsOpen || (DateTime.Now - settingsClosedAt).TotalMilliseconds < 300) { settingsPopup.IsOpen = false; return; }
+                autoCheck.Text = Autostart.Enabled ? "" : "";
+                settingsCard.LayoutTransform = zoom;    // тот же масштаб, что у виджета
+                settingsChevron.Text = "";
+                settingsPopup.IsOpen = true;
+            };
+            menuStack.Children.Add(settingsRow);
+            autoCheck = Ui.Glyph(Autostart.Enabled ? "" : "", 11, Brushes.White);
+            var autoRow = MenuRow("", L.T("Запускать вместе с Windows", "Start with Windows"), Brushes.White, autoCheck);
+            autoRow.MouseLeftButtonUp += (s, e) =>
+            {
+                e.Handled = true;
+                Autostart.Enabled = !Autostart.Enabled;
+                autoCheck.Text = Autostart.Enabled ? "" : "";
+                if (autoItem != null) autoItem.Checked = Autostart.Enabled;
+            };
+            settingsBox.Children.Add(autoRow);
+            var removeColor = Ui.Brush(0xFFFF453A);
+            var removeRow = MenuRow("", L.T("Удалить с компьютера", "Uninstall"), removeColor, null);
+            removeRow.MouseEnter += delegate { removeRow.Background = Ui.Brush(0x26FF453A); };
+            removeRow.MouseLeftButtonUp += (s, e) => { e.Handled = true; settingsPopup.IsOpen = false; menuPanel.Visibility = Visibility.Collapsed; UninstallApp(); };
+            settingsBox.Children.Add(removeRow);
+
             var closeRow = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 6, 8, 6), Margin = new Thickness(-8, 0, -8, -6), Background = Brushes.Transparent, Cursor = Cursors.Hand };
             var closeContent = new StackPanel { Orientation = Orientation.Horizontal };
             closeContent.Children.Add(Ui.Glyph("", 11, Brushes.White));
@@ -876,6 +937,7 @@ namespace NowPlaying
                 Margin = new Thickness(0, 52, 18, 0), Visibility = Visibility.Collapsed, Child = menuStack
             };
             menuPanel.MouseLeftButtonDown += (s, e) => e.Handled = true;   // клик по меню не двигает окно
+            menuPanel.IsVisibleChanged += delegate { if (!menuPanel.IsVisible) settingsPopup.IsOpen = false; };   // меню закрылось — и «Настройки» тоже
             card.Children.Add(menuPanel);
             var root = new Grid { Margin = new Thickness(18) };
             root.Children.Add(shadow);
@@ -898,7 +960,9 @@ namespace NowPlaying
             {
                 if (menuPanel.Visibility == Visibility.Visible) { menuPanel.Visibility = Visibility.Collapsed; return; }
                 if (locked) return;
+                double before = Top;
                 try { DragMove(); } catch (InvalidOperationException) { }
+                if (Math.Abs(Top - before) > 1) topBeforeMixer = double.NaN;   // сам передвинул — после микшера не возвращаем
                 SavePosition();
             };
             PreviewMouseWheel += (s, e) =>
@@ -923,7 +987,7 @@ namespace NowPlaying
             lockItem = new Forms.ToolStripMenuItem(L.T("Замок (заморозить место и размер)", "Lock (freeze position and size)")) { CheckOnClick = true };
             lockItem.CheckedChanged += delegate { SetLocked(lockItem.Checked); };
             menu.Items.Add(lockItem);
-            var autoItem = new Forms.ToolStripMenuItem(L.T("Запускать вместе с Windows", "Start with Windows")) { Checked = Autostart.Enabled, CheckOnClick = true };
+            autoItem = new Forms.ToolStripMenuItem(L.T("Запускать вместе с Windows", "Start with Windows")) { Checked = Autostart.Enabled, CheckOnClick = true };
             autoItem.CheckedChanged += delegate { Autostart.Enabled = autoItem.Checked; };
             menu.Items.Add(autoItem);
             // язык: смена перезапускает виджет — так все надписи сразу на новом языке
@@ -955,7 +1019,7 @@ namespace NowPlaying
             sound.Bridge = bridge;           // громкость только трека на SoundCloud — через расширение
             sound.ShowPlayerRequested += ShowWidget;
             sound.PlayerMoved += () => { KeepOnScreen(); SavePosition(); };
-            sound.ExpandedChanged += SavePosition;
+            sound.ExpandedChanged += OnMixerToggled;
             ShowEmpty();
             bridge.Start();
 
@@ -1333,6 +1397,54 @@ namespace NowPlaying
             card.Clip = shape;
             shadowShape.Data = shape;
             edgeShape.Data = shape;
+        }
+
+        // Строка меню «⋯»: значок, текст и, если нужно, что-то справа (галочка, стрелочка).
+        static Border MenuRow(string glyph, string text, Brush color, UIElement right)
+        {
+            var row = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 6, 8, 6), Margin = new Thickness(-8, 0, -8, 2), Background = Brushes.Transparent, Cursor = Cursors.Hand };
+            var g = new Grid();
+            g.ColumnDefinitions.Add(new ColumnDefinition());
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var left = new StackPanel { Orientation = Orientation.Horizontal };
+            left.Children.Add(Ui.Glyph(glyph, 11, color));
+            left.Children.Add(new TextBlock { Text = text, Foreground = color, FontSize = 13, Margin = new Thickness(10, 0, 0, 0), TextWrapping = TextWrapping.Wrap });
+            g.Children.Add(left);
+            if (right != null)
+            {
+                var fe = right as FrameworkElement;
+                if (fe != null) { fe.VerticalAlignment = VerticalAlignment.Center; fe.Margin = new Thickness(8, 0, 0, 0); }
+                Grid.SetColumn(right, 1);
+                g.Children.Add(right);
+            }
+            row.Child = g;
+            row.MouseEnter += delegate { row.Background = Ui.Hover; };
+            row.MouseLeave += delegate { row.Background = Brushes.Transparent; };
+            row.MouseLeftButtonDown += (s, e) => e.Handled = true;
+            return row;
+        }
+
+        // Микшер раскрыли — запоминаем, где был плеер (у нижнего края окно поднимется, чтобы микшер влез).
+        // Свернули — возвращаем плеер туда же, если его за это время не двигали руками.
+        void OnMixerToggled()
+        {
+            if (sound.Expanded) { topBeforeMixer = Top; pendingTop = double.NaN; }
+            else if (!double.IsNaN(topBeforeMixer))
+            {
+                pendingTop = topBeforeMixer;   // поставим на место, когда окно уменьшится (SizeChanged)
+                topBeforeMixer = double.NaN;
+                return;
+            }
+            SavePosition();
+        }
+
+        // «Удалить с компьютера»: запускаем программу удаления из установщика, у неё своё окно с подтверждением.
+        void UninstallApp()
+        {
+            var uninstaller = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Uninstall.exe");
+            if (File.Exists(uninstaller)) { Process.Start(uninstaller, "--uninstall"); return; }
+            MessageBox.Show(L.T("Программа удаления не найдена. Удалить «Сейчас играет» можно в «Параметры → Приложения → Установленные приложения».",
+                                "The uninstaller was not found. You can remove Now Playing in Settings → Apps → Installed apps."), L.T("Сейчас играет", "Now Playing"));
         }
 
         void ToggleMenu()
