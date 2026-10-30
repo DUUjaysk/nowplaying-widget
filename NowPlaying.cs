@@ -1329,7 +1329,7 @@ namespace NowPlaying
 
         static void OpenExtensionFolder()
         {
-            try { Process.Start("explorer.exe", "\"" + System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "soundcloud-extension") + "\""); }
+            try { Process.Start("explorer.exe", "/select,\"" + System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "soundcloud-extension") + "\""); }
             catch (Exception ex) { Debug.WriteLine(ex); }
         }
 

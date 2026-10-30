@@ -128,7 +128,8 @@ namespace NowPlaying
             {
                 try { Clipboard.SetText(Folder); Flash(L.T("Путь скопирован — вставь его в окне выбора папки (Ctrl+V) и нажми Enter.", "Path copied — paste it into the folder dialog (Ctrl+V) and press Enter.")); } catch { }
             }));
-            s3.Children.Add(Button(L.T("Открыть папку", "Open folder"), () => { try { Process.Start("explorer.exe", "\"" + Folder + "\""); } catch { } }));
+            // папку показываем снаружи и выделенной: видно, какую именно выбрать в «Загрузить распакованное»
+            s3.Children.Add(Button(L.T("Показать папку", "Show folder"), () => { try { Process.Start("explorer.exe", "/select,\"" + Folder + "\""); } catch { } }));
             body.Children.Add(Step(3, L.T("Нажми «Загрузить распакованное» и выбери папку", "Click “Load unpacked” and choose the folder"),
                 Folder, s3));
 
