@@ -258,6 +258,22 @@ namespace NowPlaying
         }
 
         public readonly ListenLog Listens = new ListenLog();   // статистика прослушиваний (расширение 1.3+)
+
+        // Расширение хоть раз присылало отчёт — с этого запуска или раньше (помечено в реестре).
+        public bool Connected
+        {
+            get
+            {
+                lock (sync) if (tabs.Count > 0) return true;
+                try
+                {
+                    using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\NowPlayingWidget"))
+                        return k != null && "1".Equals(k.GetValue("ExtensionSeen"));
+                }
+                catch { return false; }
+            }
+        }
+        bool seenSaved;
         readonly object sync = new object();
         readonly Dictionary<int, TabState> tabs = new Dictionary<int, TabState>();
         readonly List<string> commands = new List<string>();
@@ -404,6 +420,11 @@ namespace NowPlaying
                     Seen = DateTime.Now
                 };
                 lastBodies[tab] = DateTime.Now.ToString("HH:mm:ss.f") + " " + body;
+                if (!seenSaved)
+                {
+                    seenSaved = true;   // запомнить, что расширение подключено, — инструкция больше не будет напрашиваться
+                    try { using (var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\NowPlayingWidget")) k.SetValue("ExtensionSeen", "1"); } catch { }
+                }
                 var reply = new List<string>();
                 if (ActiveTab() == tab)
                 {
@@ -899,6 +920,17 @@ namespace NowPlaying
                 if (autoItem != null) autoItem.Checked = Autostart.Enabled;
             };
             settingsBox.Children.Add(autoRow);
+            // «Расширение для SoundCloud»: справа галочка, если подключено, иначе восклицательный знак
+            var extMark = Ui.Glyph("", 11, Brushes.White);
+            var extRow = MenuRow("", L.T("Расширение для SoundCloud", "SoundCloud extension"), Brushes.White, extMark);
+            extRow.MouseLeftButtonUp += (s, e) => { e.Handled = true; settingsPopup.IsOpen = false; menuPanel.Visibility = Visibility.Collapsed; ExtensionGuide.Show(bridge); };
+            settingsBox.Children.Add(extRow);
+            settingsCard.IsVisibleChanged += delegate
+            {
+                bool on = bridge.Connected;
+                extMark.Text = on ? "" : "";
+                extMark.Foreground = on ? Brushes.White : Ui.Brush(0xFFFFB340);
+            };
             var removeColor = Ui.Brush(0xFFFF453A);
             var removeRow = MenuRow("", L.T("Удалить с компьютера", "Uninstall"), removeColor, null);
             removeRow.MouseEnter += delegate { removeRow.Background = Ui.Brush(0x26FF453A); };
@@ -980,7 +1012,7 @@ namespace NowPlaying
             menu.Items.Add(L.T("Показать / скрыть", "Show / hide"), null, delegate { Toggle(); });
             menu.Items.Add(L.T("Открыть SoundCloud", "Open SoundCloud"), null, delegate { OpenSoundCloud(); });
             menu.Items.Add(L.T("Статистика прослушиваний", "Listening stats"), null, delegate { OpenStats(); });
-            menu.Items.Add(L.T("Расширение для SoundCloud (папка)", "SoundCloud extension (folder)"), null, delegate { OpenExtensionFolder(); });
+            menu.Items.Add(L.T("Как подключить расширение для SoundCloud", "How to connect the SoundCloud extension"), null, delegate { ExtensionGuide.Show(bridge); });
             topmostItem = new Forms.ToolStripMenuItem(L.T("Поверх всех окон", "Always on top")) { CheckOnClick = true };
             topmostItem.CheckedChanged += delegate { SetTopmost(topmostItem.Checked); };
             menu.Items.Add(topmostItem);
@@ -1438,6 +1470,32 @@ namespace NowPlaying
             SavePosition();
         }
 
+        // Инструкция по расширению: сразу после установки (force) или один раз при первом запуске —
+        // через 4 секунды, и только если расширение за это время так и не отозвалось.
+        public void OfferExtensionGuide(bool force)
+        {
+            if (force) { ExtensionGuide.Show(bridge); MarkGuideOffered(); return; }
+            try
+            {
+                using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(SettingsKey))
+                    if (k != null && "1".Equals(k.GetValue("ExtensionGuideOffered"))) return;
+            }
+            catch { }
+            var wait = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+            wait.Tick += delegate
+            {
+                wait.Stop();
+                MarkGuideOffered();
+                if (!bridge.Connected) ExtensionGuide.Show(bridge);
+            };
+            wait.Start();
+        }
+
+        void MarkGuideOffered()
+        {
+            try { using (var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(SettingsKey)) k.SetValue("ExtensionGuideOffered", "1"); } catch { }
+        }
+
         // «Удалить с компьютера»: запускаем программу удаления из установщика, у неё своё окно с подтверждением.
         void UninstallApp()
         {
@@ -1627,6 +1685,7 @@ namespace NowPlaying
             listener.Start();
 
             if (!args.Contains("--hidden")) window.ShowWidget();
+            if (!args.Contains("--hidden")) window.OfferExtensionGuide(args.Contains("--extension-guide"));
             app.Run();
             GC.KeepAlive(mutex);
         }

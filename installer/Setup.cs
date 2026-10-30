@@ -326,7 +326,7 @@ namespace NowPlayingSetup
         {
             if (done)
             {
-                if (!uninstallMode) Process.Start(Product.Exe);
+                if (!uninstallMode) Process.Start(Product.Exe, "--extension-guide");   // плеер сразу покажет, как подключить расширение
                 Close();
                 return;
             }
@@ -344,10 +344,10 @@ namespace NowPlayingSetup
                 else
                 {
                     Installer.Install(desktopBox.IsChecked == true, autostartBox.IsChecked == true, s => statusText.Text = s);
-                    statusText.Text = L.T("Готово! Ярлык «" + Product.Name + "» — в меню «Пуск». Для повтора, перемешивания, лайков и статистики SoundCloud " +
-                                          "загрузите в Opera или Chrome расширение из папки soundcloud-extension (opera://extensions или chrome://extensions → «Режим разработчика» → «Загрузить распакованное»).",
-                                          "Done! The " + Product.Name + " shortcut is in the Start menu. For SoundCloud repeat, shuffle, likes and stats, load the extension " +
-                                          "from the soundcloud-extension folder in Opera or Chrome (opera://extensions or chrome://extensions → Developer mode → Load unpacked).");
+                    statusText.Text = L.T("Готово! Ярлык «" + Product.Name + "» — в меню «Пуск». Нажми «Запустить»: откроется короткая инструкция, " +
+                                          "как за минуту подключить расширение для SoundCloud (повтор, перемешивание, лайк и статистика).",
+                                          "Done! The " + Product.Name + " shortcut is in the Start menu. Click Launch: a short guide will show how to connect " +
+                                          "the SoundCloud extension in a minute (repeat, shuffle, like and stats).");
                     mainLabel.Text = L.T("Запустить", "Launch");
                 }
                 done = true;

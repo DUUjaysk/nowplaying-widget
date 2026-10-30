@@ -13,7 +13,7 @@ $facades = Get-ChildItem "$env:WINDIR\Microsoft.NET\assembly\GAC_MSIL" -Recurse 
 & "$fw\csc.exe" /nologo /codepage:65001 /target:winexe /optimize+ "/out:$stage\NowPlaying.exe" "/win32icon:$root\nowplaying.ico" "/lib:$fw\WPF" `
     /r:PresentationFramework.dll /r:PresentationCore.dll /r:WindowsBase.dll /r:System.Xaml.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Core.dll /r:System.Web.Extensions.dll `
     "/r:$wm\Windows.Media.winmd" "/r:$wm\Windows.Foundation.winmd" "/r:$wm\Windows.Storage.winmd" $facades `
-    "$root\NowPlaying.cs" "$root\MixerParts.cs" "$root\SoundPanel.cs" "$root\Listens.cs" "$root\StatsPage.cs" "$root\Lang.cs"
+    "$root\NowPlaying.cs" "$root\MixerParts.cs" "$root\SoundPanel.cs" "$root\Listens.cs" "$root\StatsPage.cs" "$root\Lang.cs" "$root\ExtensionGuide.cs"
 if ($LASTEXITCODE -ne 0) { throw 'Не собрался NowPlaying.exe' }
 
 # 2. установщик с файлами внутри
