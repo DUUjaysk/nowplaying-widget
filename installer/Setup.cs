@@ -10,6 +10,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Text;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
@@ -25,7 +28,7 @@ namespace NowPlayingSetup
     {
         public static string Name { get { return L.T("Сейчас играет", "Now Playing"); } }
         public static readonly string[] AllNames = { "Сейчас играет", "Now Playing" };   // ярлыки на обоих языках
-        public const string Version = "1.4.3";
+        public const string Version = "1.4.4";
         public const string Publisher = "DUUjaysk";
         public const string ExeName = "NowPlaying.exe";
         public const string ProcessName = "NowPlaying";
@@ -36,8 +39,9 @@ namespace NowPlayingSetup
 
         public static string Dir { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Programs\NowPlaying"); } }
         public static string Exe { get { return Path.Combine(Dir, ExeName); } }
-        public static string DesktopLink(string name) { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), name + ".lnk"); }
-        public static string StartLink(string name) { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), name + ".lnk"); }
+        // DoNotVerify: без него путь к ещё не созданной папке приходит пустым
+        public static string DesktopLink(string name) { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory, Environment.SpecialFolderOption.DoNotVerify), name + ".lnk"); }
+        public static string StartLink(string name) { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs, Environment.SpecialFolderOption.DoNotVerify), name + ".lnk"); }
     }
 
     // Язык установщика и виджета. По умолчанию — уже выбранный раньше, иначе язык Windows.
@@ -108,8 +112,9 @@ namespace NowPlayingSetup
 
             status(L.T("Создаю ярлыки…", "Creating shortcuts…"));
             DeleteLinks();                        // в том числе ярлыки прошлой установки на другом языке
-            Shortcut(Product.StartLink(Product.Name));
-            if (desktopLink) Shortcut(Product.DesktopLink(Product.Name));
+            LinkProblem = null;
+            TryShortcut(Product.StartLink(Product.Name));
+            if (desktopLink) TryShortcut(Product.DesktopLink(Product.Name));
 
             using (var run = Registry.CurrentUser.CreateSubKey(Product.RunKey))
             {
@@ -155,19 +160,53 @@ namespace NowPlayingSetup
             return new DirectoryInfo(dir).GetFiles("*", SearchOption.AllDirectories).Sum(f => f.Length);
         }
 
-        // Ярлык через WScript.Shell (позднее связывание: без лишних библиотек)
+        // Причина, по которой не создался ярлык. Без ярлыка программа всё равно установлена и запускается.
+        public static string LinkProblem;
+
+        static void TryShortcut(string path)
+        {
+            try { Shortcut(path); }
+            catch (Exception ex) { LinkProblem = path + ": " + ex.Message; }
+        }
+
+        // Ярлык через системный IShellLink: тот же способ, что у Проводника, скриптовые компоненты не нужны
         static void Shortcut(string path)
         {
-            var type = Type.GetTypeFromProgID("WScript.Shell");
-            object shell = Activator.CreateInstance(type);
-            object link = type.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { path });
-            var lt = link.GetType();
-            lt.InvokeMember("TargetPath", BindingFlags.SetProperty, null, link, new object[] { Product.Exe });
-            lt.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, link, new object[] { Product.Dir });
-            lt.InvokeMember("IconLocation", BindingFlags.SetProperty, null, link, new object[] { Product.Exe + ",0" });
-            lt.InvokeMember("Description", BindingFlags.SetProperty, null, link, new object[] { L.T("Виджет плеера и микшера в стиле iOS", "iOS-style player and mixer widget") });
-            lt.InvokeMember("Save", BindingFlags.InvokeMethod, null, link, null);
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            var link = (IShellLinkW)new ShellLink();
+            link.SetPath(Product.Exe);
+            link.SetWorkingDirectory(Product.Dir);
+            link.SetIconLocation(Product.Exe, 0);
+            link.SetDescription(L.T("Виджет плеера и микшера в стиле iOS", "iOS-style player and mixer widget"));
+            ((IPersistFile)link).Save(path, true);
         }
+    }
+
+    [ComImport, Guid("00021401-0000-0000-C000-000000000046")]
+    class ShellLink { }
+
+    // Порядок методов задан Windows, поэтому здесь перечислены и те, что не используются
+    [ComImport, InterfaceType(ComInterfaceType.InterfaceIsIUnknown), Guid("000214F9-0000-0000-C000-000000000046")]
+    interface IShellLinkW
+    {
+        void GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder file, int size, IntPtr data, int flags);
+        void GetIDList(out IntPtr list);
+        void SetIDList(IntPtr list);
+        void GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder text, int size);
+        void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string text);
+        void GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder dir, int size);
+        void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string dir);
+        void GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder args, int size);
+        void SetArguments([MarshalAs(UnmanagedType.LPWStr)] string args);
+        void GetHotkey(out short key);
+        void SetHotkey(short key);
+        void GetShowCmd(out int cmd);
+        void SetShowCmd(int cmd);
+        void GetIconLocation([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder path, int size, out int index);
+        void SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string path, int index);
+        void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string path, int reserved);
+        void Resolve(IntPtr window, int flags);
+        void SetPath([MarshalAs(UnmanagedType.LPWStr)] string file);
     }
 
     // ---------------- Окно в стиле виджета ----------------
@@ -348,6 +387,9 @@ namespace NowPlayingSetup
                                           "как за минуту подключить расширение для SoundCloud (повтор, перемешивание, лайк и статистика).",
                                           "Done! The " + Product.Name + " shortcut is in the Start menu. Click Launch: a short guide will show how to connect " +
                                           "the SoundCloud extension in a minute (repeat, shuffle, like and stats).");
+                    if (Installer.LinkProblem != null)
+                        statusText.Text = L.T("Программа установлена, нажми «Запустить». Ярлык создать не удалось, поэтому запускай её из папки " + Product.Dir + ". Причина: ",
+                                              "The app is installed, click Launch. A shortcut could not be created, so run it from " + Product.Dir + ". Reason: ") + Installer.LinkProblem;
                     mainLabel.Text = L.T("Запустить", "Launch");
                 }
                 done = true;
@@ -409,6 +451,7 @@ namespace NowPlayingSetup
                 {
                     if (uninstall) Installer.Uninstall(args.Contains("--purge"));
                     else Installer.Install(!args.Contains("--no-desktop"), !args.Contains("--no-autostart"), s => Console.WriteLine(s));
+                    if (Installer.LinkProblem != null) Console.WriteLine("Shortcut problem: " + Installer.LinkProblem);
                     return 0;
                 }
                 catch (Exception ex)
