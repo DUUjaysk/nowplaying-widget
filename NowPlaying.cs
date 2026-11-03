@@ -241,6 +241,7 @@ namespace NowPlaying
     class SoundCloudBridge
     {
         public const int Port = 48251;
+        const int MaxBody = 2000000;             // история аккаунта — сотни треков, обычный отчёт вкладки намного меньше
 
         class TabState
         {
@@ -370,7 +371,7 @@ namespace NowPlaying
                         if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
                             int.TryParse(line.Substring(15).Trim(), out length);
                     }
-                    var body = new char[Math.Min(length, 4096)];
+                    var body = new char[Math.Min(length, MaxBody)];
                     int read = 0;
                     while (read < body.Length)
                     {
@@ -383,6 +384,8 @@ namespace NowPlaying
                     if (requestLine.Length > 1 && requestLine[0] == "OPTIONS") { status = "204 No Content"; answer = ""; }
                     else if (requestLine.Length > 1 && requestLine[0] == "POST" && requestLine[1] == "/soundcloud")
                         answer = Report(new string(body, 0, read));
+                    else if (requestLine.Length > 1 && requestLine[0] == "POST" && requestLine[1] == "/history")
+                        answer = History(new string(body, 0, read));
                     else if (requestLine.Length > 1 && requestLine[0] == "GET" && requestLine[1] == "/debug")
                         answer = DebugInfo();
 
@@ -411,6 +414,7 @@ namespace NowPlaying
                     { "active", ActiveTab() },
                     { "pending", commands.ToList() },
                     { "delivered", delivered.ToList() },
+                    { "history", lastHistory },
                     { "tabs", tabs.ToDictionary(t => t.Key.ToString(), t => (object)(lastBodies.ContainsKey(t.Key) ? lastBodies[t.Key] : "")) }
                 });
             }
@@ -418,6 +422,17 @@ namespace NowPlaying
 
         readonly Dictionary<int, string> lastBodies = new Dictionary<int, string>();
         readonly List<string> delivered = new List<string>();
+        string lastHistory = "";
+
+        // Вкладка прислала историю аккаунта: виджет дописывает в статистику то, что играло не на этом компьютере.
+        string History(string body)
+        {
+            var data = json.Deserialize<Dictionary<string, object>>(body);
+            var items = data["items"] as System.Collections.ArrayList ?? new System.Collections.ArrayList();
+            int added = Listens.AddHistory(items);
+            lock (sync) lastHistory = DateTime.Now.ToString("HH:mm:ss") + " получено " + items.Count + ", добавлено " + added;
+            return json.Serialize(new Dictionary<string, object> { { "added", added } });
+        }
 
         // Вкладка прислала своё состояние; если она активная — отдаём ей накопленные команды.
         string Report(string body)

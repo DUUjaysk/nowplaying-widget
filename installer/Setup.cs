@@ -1,7 +1,8 @@
 // Установщик «Сейчас играет» / Now Playing: один exe, внутри которого программа, значок и расширение для SoundCloud.
 //   NowPlaying-Setup.exe               — окно установки (вверху выбор языка: Русский / English)
 //   NowPlaying-Setup.exe --silent [--lang ru|en] — установить без окна (для проверок)
-//   Uninstall.exe --uninstall [--silent] [--purge] — удаление (--purge стирает и настройки)
+//   Uninstall.exe --uninstall [--silent] [--purge] [--purge-stats] — удаление (--purge стирает и настройки,
+//   --purge-stats — и статистику прослушиваний; без него listens.jsonl остаётся в папке программы)
 // Ставит в %LOCALAPPDATA%\Programs\NowPlaying без прав администратора, регистрирует в «Приложениях».
 // Выбранный язык записывается в HKCU\Software\NowPlayingWidget → Language — его читает и сам виджет.
 using System;
@@ -28,7 +29,7 @@ namespace NowPlayingSetup
     {
         public static string Name { get { return L.T("Сейчас играет", "Now Playing"); } }
         public static readonly string[] AllNames = { "Сейчас играет", "Now Playing" };   // ярлыки на обоих языках
-        public const string Version = "1.4.4";
+        public const string Version = "1.4.5";
         public const string Publisher = "DUUjaysk";
         public const string ExeName = "NowPlaying.exe";
         public const string ProcessName = "NowPlaying";
@@ -36,6 +37,7 @@ namespace NowPlayingSetup
         public const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
         public const string RunValue = "NowPlayingWidget";
         public const string SettingsKey = @"Software\NowPlayingWidget";
+        public const string StatsFile = "listens.jsonl";
 
         public static string Dir { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Programs\NowPlaying"); } }
         public static string Exe { get { return Path.Combine(Dir, ExeName); } }
@@ -140,7 +142,7 @@ namespace NowPlayingSetup
             status(L.T("Готово", "Done"));
         }
 
-        public static void Uninstall(bool purgeSettings)
+        public static void Uninstall(bool purgeSettings, bool purgeStats)
         {
             CloseRunning();
             DeleteLinks();
@@ -148,11 +150,21 @@ namespace NowPlayingSetup
             Registry.CurrentUser.DeleteSubKeyTree(Product.UninstallKey, false);
             if (purgeSettings) Registry.CurrentUser.DeleteSubKeyTree(Product.SettingsKey, false);
             // Uninstall.exe сейчас запущен из этой папки (копией из %TEMP%), поэтому папку можно стереть
-            for (int i = 0; i < 10 && Directory.Exists(Product.Dir); i++)
+            for (int i = 0; i < 10; i++)
             {
-                try { Directory.Delete(Product.Dir, true); }
+                try { DeleteProgramFiles(Product.Dir, !purgeStats); return; }
                 catch { Thread.Sleep(300); }
             }
+        }
+
+        // Стирает папку программы. Статистику прослушиваний оставляет: её не вернуть, а при новой установке виджет продолжит тот же файл.
+        public static void DeleteProgramFiles(string dir, bool keepStats)
+        {
+            if (!Directory.Exists(dir)) return;
+            if (!keepStats || !File.Exists(Path.Combine(dir, Product.StatsFile))) { Directory.Delete(dir, true); return; }
+            foreach (var sub in Directory.GetDirectories(dir)) Directory.Delete(sub, true);
+            foreach (var file in Directory.GetFiles(dir))
+                if (!string.Equals(Path.GetFileName(file), Product.StatsFile, StringComparison.OrdinalIgnoreCase)) File.Delete(file);
         }
 
         static long DirSize(string dir)
@@ -229,8 +241,8 @@ namespace NowPlayingSetup
     {
         readonly bool uninstallMode;
         readonly StackPanel body = new StackPanel { Margin = new Thickness(28, 24, 28, 24) };
-        CheckBox desktopBox, autostartBox, purgeBox;
-        bool desktopOn = true, autostartOn = true, purgeOn;
+        CheckBox desktopBox, autostartBox, purgeBox, purgeStatsBox;
+        bool desktopOn = true, autostartOn = true, purgeOn, purgeStatsOn;
         TextBlock statusText;
         Border mainButton;
         TextBlock mainLabel;
@@ -266,6 +278,7 @@ namespace NowPlayingSetup
             if (desktopBox != null) desktopOn = desktopBox.IsChecked == true;
             if (autostartBox != null) autostartOn = autostartBox.IsChecked == true;
             if (purgeBox != null) purgeOn = purgeBox.IsChecked == true;
+            if (purgeStatsBox != null) purgeStatsOn = purgeStatsBox.IsChecked == true;
             body.Children.Clear();
             Title = (uninstallMode ? L.T("Удаление: ", "Uninstall: ") : L.T("Установка: ", "Setup: ")) + Product.Name;
 
@@ -318,9 +331,12 @@ namespace NowPlayingSetup
             var infoStack = new StackPanel();
             if (uninstallMode)
             {
-                infoStack.Children.Add(Line(L.T("Виджет будет закрыт, ярлыки, автозапуск и файлы — удалены.", "The widget will be closed; shortcuts, autostart and files will be removed.")));
+                infoStack.Children.Add(Line(L.T("Виджет будет закрыт, ярлыки, автозапуск и файлы — удалены. Статистика прослушиваний останется в папке программы.",
+                                                "The widget will be closed; shortcuts, autostart and files will be removed. Listening stats will stay in the program folder.")));
                 purgeBox = Check(L.T("Удалить и настройки (место, размер, размытие)", "Also remove settings (position, size, blur)"), purgeOn);
                 infoStack.Children.Add(purgeBox);
+                purgeStatsBox = Check(L.T("Удалить и статистику прослушиваний (её не вернуть)", "Also delete listening stats (can't be restored)"), purgeStatsOn);
+                infoStack.Children.Add(purgeStatsBox);
             }
             else
             {
@@ -376,7 +392,7 @@ namespace NowPlayingSetup
                 if (uninstallMode)
                 {
                     statusText.Text = L.T("Удаляю…", "Uninstalling…");
-                    Installer.Uninstall(purgeBox.IsChecked == true);
+                    Installer.Uninstall(purgeBox.IsChecked == true, purgeStatsBox.IsChecked == true);
                     statusText.Text = L.T("«" + Product.Name + "» удалён.", Product.Name + " has been removed.");
                     mainLabel.Text = L.T("Закрыть", "Close");
                 }
@@ -449,7 +465,7 @@ namespace NowPlayingSetup
             {
                 try
                 {
-                    if (uninstall) Installer.Uninstall(args.Contains("--purge"));
+                    if (uninstall) Installer.Uninstall(args.Contains("--purge"), args.Contains("--purge-stats"));
                     else Installer.Install(!args.Contains("--no-desktop"), !args.Contains("--no-autostart"), s => Console.WriteLine(s));
                     if (Installer.LinkProblem != null) Console.WriteLine("Shortcut problem: " + Installer.LinkProblem);
                     return 0;

@@ -96,10 +96,22 @@ try { const s = localStorage.getItem('period'), p = Number(s); if (s !== null &&
 
 const rows = ALL.map(r => Object.assign({}, r, { date: new Date(r.t), sec: Number(r.sec) || 0 }))
   .filter(r => !isNaN(r.date) && r.url).sort((a, b) => a.date - b.date);
-const listens = rows.filter(r => !r.skip), skips = rows.filter(r => r.skip);
 const artistKey = r => (r.artistUrl || r.artist || '?').toLowerCase();
-const firstSeen = {}, lastSeen = {};
-listens.forEach(r => { const k = artistKey(r); if (!(k in firstSeen)) firstSeen[k] = r.date; lastSeen[k] = r.date; });
+// Откуда прослушивания: всё вместе, только этот компьютер или только телефон (строки с src:'phone' из истории аккаунта).
+const SOURCES = [[t('Везде', 'Everywhere'), 'all'], [t('Компьютер', 'Computer'), 'pc'], [t('Телефон', 'Phone'), 'phone']];
+const hasPhone = rows.some(r => r.src === 'phone');
+let source = 'all';
+try { const s = localStorage.getItem('source'); if (hasPhone && SOURCES.some(x => x[1] === s)) source = s; } catch (e) {}
+let listens = [], skips = [], firstSeen = {}, lastSeen = {};
+function applySource() {
+  const from = rows.filter(r => source === 'all' || (source === 'phone') === (r.src === 'phone'));
+  listens = from.filter(r => !r.skip); skips = from.filter(r => r.skip);
+  firstSeen = {}; lastSeen = {};
+  listens.forEach(r => { const k = artistKey(r); if (!(k in firstSeen)) firstSeen[k] = r.date; lastSeen[k] = r.date; });
+}
+applySource();
+// Секунды у телефона примерные: сайт не сообщает, сколько трек реально играл.
+function secText(r) { return r.src === 'phone' ? '📱 ~' + mmss(r.sec) : mmss(r.sec); }
 
 // ---------- мелочи ----------
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -190,6 +202,11 @@ function header(title, sub, withPeriods) {
   const view = location.hash.startsWith('#history') ? 'history' : location.hash.length > 1 ? '' : 'main';
   [[t('Обзор', 'Overview'), '', 'main'], [t('История', 'History'), 'history', 'history']].forEach(x => { const a = hashLink(x[1], x[0]); if (x[2] === view) a.className = 'on'; nav.append(a); });
   right.append(nav);
+  if (hasPhone) {
+    const pills = el('div', 'pills');
+    SOURCES.forEach(x => { const b = el('button', x[1] === source ? 'on' : null, x[0]); b.onclick = () => { source = x[1]; try { localStorage.setItem('source', source); } catch (e) {} applySource(); render(); }; pills.append(b); });
+    right.append(pills);
+  }
   if (withPeriods) {
     const pills = el('div', 'pills');
     PERIODS.forEach(p => { const b = el('button', p[1] === period ? 'on' : null, p[0]); b.onclick = () => { period = p[1]; try { localStorage.setItem('period', String(period)); } catch (e) {} render(); }; pills.append(b); });
@@ -298,7 +315,7 @@ function renderArtist(root, key) {
   const st = section(t('Треки', 'Tracks'));
   tracks.forEach((g, i) => { const r = g.items[g.items.length - 1]; st.append(row(i + 1, trackLink(r), t('впервые ', 'first ') + day(g.items[0].date), plural(g.plays, 'раз', 'раза', 'раз'), dur(g.sec), g.plays / tracks[0].plays)); });
   const sr = section(t('Последние прослушивания', 'Recent plays'));
-  list.slice(-20).reverse().forEach((r, i) => sr.append(row(i + 1, trackLink(r), day(r.date) + ' ' + r.date.toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' }), mmss(r.sec), null, null)));
+  list.slice(-20).reverse().forEach((r, i) => sr.append(row(i + 1, trackLink(r), day(r.date) + ' ' + r.date.toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' }), secText(r), null, null)));
   root.append(grid(st, sr));
 }
 
@@ -315,7 +332,7 @@ function renderTrack(root, url) {
   if (!list.length) return;
   const sc = section(t('Как слушал', 'Listening over time')); sc.append(chart(list, autoBins(list))); root.append(sc);
   const sr = section(t('Все прослушивания', 'All plays'), list.length > 100 ? t('последние 100', 'last 100') : null);
-  list.slice(-100).reverse().forEach((r, i) => sr.append(row(i + 1, el('b', null, day(r.date) + ', ' + r.date.toLocaleDateString(LOC, { weekday: 'short' })), r.date.toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' }), mmss(r.sec), null, null)));
+  list.slice(-100).reverse().forEach((r, i) => sr.append(row(i + 1, el('b', null, day(r.date) + ', ' + r.date.toLocaleDateString(LOC, { weekday: 'short' })), r.date.toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' }), secText(r), null, null)));
   root.append(sr);
 }
 
@@ -345,7 +362,7 @@ function renderHistory(root) {
         const line = el('div', 'hist');
         line.append(el('div', 'tm', r.date.toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' })));
         const n = el('div', 'name'); n.append(trackLink(r)); const i = el('i'); i.append(artistLink(r)); n.append(i);
-        line.append(n, el('div', 'val', mmss(r.sec)));
+        line.append(n, el('div', 'val', secText(r)));
         box.append(line);
       }
     }
@@ -364,7 +381,7 @@ function render() {
   else if (h === 'history') renderHistory(root);
   else renderMain(root);
 }
-document.getElementById('foot').textContent = t('Считаются прослушивания на этом компьютере от 30 секунд; переключённые на 3–30 секунде треки — пропуски. Страница собрана виджетом «Сейчас играет».', 'Plays on this computer of at least 30 seconds are counted; tracks switched at 3–30 seconds are skips. Page built by the Now Playing widget.');
+document.getElementById('foot').textContent = t('На компьютере считаются прослушивания от 30 секунд; переключённые на 3–30 секунде треки — пропуски. Телефон (📱) — примерно, по истории аккаунта: время и секунды неточные, повторы одного трека могут не попасть. Страница собрана виджетом «Сейчас играет».', 'On this computer, plays of at least 30 seconds are counted; tracks switched at 3–30 seconds are skips. Phone (📱) is approximate, from your account history: times and seconds are rough and repeats of a track may be missed. Page built by the Now Playing widget.');
 window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
 render();
 </script>
