@@ -24,6 +24,7 @@ Windows media controls (browsers, Spotify, players), and has deep extra integrat
   history with search, artist and track pages, habits and streaks, skips, charts by day, hour and weekday.
   Everything is stored locally on your computer.
 - Glass look, resize (corner grip or Ctrl + mouse wheel), lock 🔒, always on top 📌, tray icon, autostart.
+- **Taskbar mini player:** minimizing shows rounded artwork and previous / pause / next buttons next to the notification area. Its transparent background lets the actual taskbar gradient show through at its current position. Click the artwork to restore, or drag it left to move it. Right-click to reset its position or hide it to the tray. This separate overlay does not reserve taskbar space. It hides with an auto-hidden taskbar and full-screen apps on that monitor; unusual taskbar layouts use a position above the taskbar.
 - **Two languages:** English and Russian — choose in the installer or later in the tray menu (*Язык / Language*).
 
 ## Install
@@ -72,6 +73,7 @@ This builds `NowPlaying.exe` and packs it with the icon and the extension into `
 | File | What it is |
 |---|---|
 | `NowPlaying.cs` | the player window, SoundCloud bridge, tray |
+| `TaskbarMini.cs` | compact player next to the taskbar notification area |
 | `SoundPanel.cs` | the volume strip, mixer, detached mixer, output devices |
 | `MixerParts.cs` | WASAPI (Core Audio) interop and mixer controls |
 | `Listens.cs`, `StatsPage.cs` | listening stats and the stats page template |
@@ -109,6 +111,7 @@ Spotify, плееры), а с **SoundCloud** интегрирован особе
   история с поиском, страницы артиста и трека, привычки и серии, пропуски, графики по дням, часам и дням недели.
   Всё хранится только на твоём компьютере.
 - Стиль «стекла», изменение размера (уголок или Ctrl + колёсико), замок 🔒, поверх всех окон 📌, трей, автозапуск.
+- **Мини-плеер у трея:** при сворачивании остаются скруглённая обложка и кнопки «назад / пауза / вперёд». Фон прозрачный: через него виден настоящий градиент панели задач именно в месте мини-плеера. Нажатие на обложку возвращает плеер, перетаскивание сдвигает мини-плеер левее. Правой кнопкой — возврат к трею или полное скрытие. Это окно поверх панели задач: Windows не резервирует для него место. При автоскрытии панели и полноэкранном окне на этом мониторе мини-плеер скрывается. Для нестандартной панели предусмотрено размещение над ней.
 - **Два языка:** русский и английский — выбор в установщике или потом в меню значка в трее («Язык / Language»).
 
 ## Установка

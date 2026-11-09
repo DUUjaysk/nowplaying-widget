@@ -667,6 +667,7 @@ namespace NowPlaying
         readonly GlyphToggle shuffleButton;
         readonly GlyphToggle repeatButton;
         readonly SoundCloudBridge bridge = new SoundCloudBridge();
+        readonly TaskbarMini mini;
         readonly Border heartButton;
         readonly TextBlock heartGlyph;
         readonly Border openButton;
@@ -714,6 +715,8 @@ namespace NowPlaying
 
         public PlayerWindow()
         {
+            mini = new TaskbarMini(ShowWidget, () => Command(s => s.TrySkipPreviousAsync()), TogglePlay,
+                () => Command(s => s.TrySkipNextAsync()));
             Title = L.T("Сейчас играет", "Now Playing");
             WindowStyle = WindowStyle.None;
             AllowsTransparency = true;
@@ -972,7 +975,7 @@ namespace NowPlaying
             var closeRow = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 6, 8, 6), Margin = new Thickness(-8, 0, -8, -6), Background = Brushes.Transparent, Cursor = Cursors.Hand };
             var closeContent = new StackPanel { Orientation = Orientation.Horizontal };
             closeContent.Children.Add(Ui.Glyph("", 11, Brushes.White));
-            closeContent.Children.Add(new TextBlock { Text = L.T("Свернуть в трей", "Minimize to tray"), Foreground = Brushes.White, FontSize = 13, Margin = new Thickness(10, 0, 0, 0) });
+            closeContent.Children.Add(new TextBlock { Text = L.T("Мини-плеер у трея", "Mini player next to tray"), Foreground = Brushes.White, FontSize = 13, Margin = new Thickness(10, 0, 0, 0) });
             closeRow.Child = closeContent;
             closeRow.MouseEnter += delegate { closeRow.Background = Ui.Hover; };
             closeRow.MouseLeave += delegate { closeRow.Background = Brushes.Transparent; };
@@ -1201,6 +1204,8 @@ namespace NowPlaying
             finally
             {
                 busy = false;
+                mini.Update(backdrop.Source, titleText.Text, playing, playButton.IsEnabled,
+                    prevButton.IsEnabled, nextButton.IsEnabled);
             }
         }
 
@@ -1638,6 +1643,7 @@ namespace NowPlaying
 
         public void ShowWidget()
         {
+            mini.Dismiss();
             if (!IsVisible)
             {
                 Show();
@@ -1647,13 +1653,18 @@ namespace NowPlaying
             Refresh();
         }
 
+        public void MinimizeToTaskbar() { HideWidget(); }
+
         void HideWidget()
         {
             Hide();
+            mini.Update(backdrop.Source, titleText.Text, playing, playButton.IsEnabled,
+                prevButton.IsEnabled, nextButton.IsEnabled);
+            mini.Present();
             if (!hintShown)
             {
                 hintShown = true;
-                tray.ShowBalloonTip(3000, L.T("Сейчас играет", "Now Playing"), L.T("Плеер свёрнут в трей. Нажмите на значок, чтобы открыть его снова.", "The player is in the tray. Click the icon to open it again."), Forms.ToolTipIcon.None);
+                tray.ShowBalloonTip(3000, L.T("Сейчас играет", "Now Playing"), L.T("Мини-плеер — слева от трея. Нажмите на обложку, чтобы вернуть полный плеер. Обложку можно перетянуть левее.", "The mini player is next to the tray. Click its artwork to restore the player, or drag it left to move it."), Forms.ToolTipIcon.None);
             }
         }
 
@@ -1675,10 +1686,12 @@ namespace NowPlaying
             ExitApp();
         }
 
-        void ExitApp()
+        public void ExitApp()
         {
-            bridge.Listens.Flush();   // дослушанный до 30 секунд трек не пропадает
+            if (exiting) return;
             exiting = true;
+            mini.Finish();
+            bridge.Listens.Flush();   // дослушанный до 30 секунд трек не пропадает
             tray.Visible = false;
             tray.Dispose();
             Application.Current.Shutdown();
@@ -1690,6 +1703,13 @@ namespace NowPlaying
         [STAThread]
         static void Main(string[] args)
         {
+            // Локальная команда завершения проходит через обычный ExitApp: статистика сохраняется.
+            if (args.Contains("--quit") || args.Contains("--restart"))
+            {
+                try { using (var signal = EventWaitHandle.OpenExisting(@"Local\NowPlayingWidgetExit")) signal.Set(); }
+                catch (WaitHandleCannotBeOpenedException) { }
+                if (args.Contains("--quit")) return;
+            }
             bool created;
             var mutex = new Mutex(true, @"Local\NowPlayingWidget", out created);
             if (!created && args.Contains("--restart"))   // перезапуск: ждём, пока старый экземпляр закроется
@@ -1703,6 +1723,7 @@ namespace NowPlaying
                 return;
             }
             var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\NowPlayingWidgetShow");
+            var exitEvent = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\NowPlayingWidgetExit");
 
             var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             var window = new PlayerWindow();
@@ -1710,14 +1731,20 @@ namespace NowPlaying
             {
                 while (true)
                 {
-                    showEvent.WaitOne();
+                    int signal = WaitHandle.WaitAny(new WaitHandle[] { showEvent, exitEvent });
+                    if (signal == 1)
+                    {
+                        window.Dispatcher.BeginInvoke(new Action(window.ExitApp));
+                        return;
+                    }
                     window.Dispatcher.BeginInvoke(new Action(window.ShowWidget));
                 }
             }) { IsBackground = true };
             listener.Start();
 
-            if (!args.Contains("--hidden")) window.ShowWidget();
-            if (!args.Contains("--hidden")) window.OfferExtensionGuide(args.Contains("--extension-guide"));
+            if (args.Contains("--mini")) window.MinimizeToTaskbar();
+            else if (!args.Contains("--hidden")) window.ShowWidget();
+            if (!args.Contains("--hidden") && !args.Contains("--mini")) window.OfferExtensionGuide(args.Contains("--extension-guide"));
             app.Run();
             GC.KeepAlive(mutex);
         }
