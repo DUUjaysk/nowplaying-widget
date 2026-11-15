@@ -14,6 +14,7 @@ Windows media controls (browsers, Spotify, players), and has deep extra integrat
 
 ## Features
 
+- **Simplified menu:** background blur, listening stats and taskbar mini player. The separate **Management** section contains autostart, the SoundCloud extension guide and quit. Its rows have consistent spacing and distinct vector icons.
 - **Player:** cover art, blurred background from the cover, seek bar, ⏮ ⏯ ⏭.
 - **SoundCloud extras** (via the bundled browser extension): 🔀 shuffle, 🔁 repeat (off → track → playlist), ❤️ like,
   and volume of **only the track** — not the whole browser.
@@ -101,6 +102,7 @@ Spotify, плееры), а с **SoundCloud** интегрирован особе
 
 ## Возможности
 
+- **Упрощённое меню:** размытие фона, статистика прослушивания и мини-плеер у трея. В отдельном разделе **«Управление»** — автозапуск, инструкция по расширению SoundCloud и выход. У строк одинаковые интервалы и разные векторные значки.
 - **Плеер:** обложка, размытый фон из неё, перемотка, ⏮ ⏯ ⏭.
 - **Для SoundCloud** (через расширение из комплекта): 🔀 перемешивание, 🔁 повтор (выкл → трек → плейлист), ❤️ лайк
   и громкость **только трека**, а не всего браузера.

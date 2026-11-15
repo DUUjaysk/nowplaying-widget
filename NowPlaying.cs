@@ -681,9 +681,9 @@ namespace NowPlaying
         readonly TextBlock lockGlyph;
         readonly Border menuPanel;
         readonly SeekBar blurBar;
-        TextBlock autoCheck;                       // галочка «Запускать вместе с Windows» в «Настройках»
+        TextBlock autoCheck;                       // галочка «Запускать вместе с Windows» в «Управлении»
         Forms.ToolStripMenuItem autoItem;          // тот же пункт в меню трея
-        System.Windows.Controls.Primitives.Popup settingsPopup;   // «Настройки» — окошко справа от меню «⋯»
+        System.Windows.Controls.Primitives.Popup settingsPopup;   // «Управление» — карточка справа от меню «⋯»
         DateTime settingsClosedAt;
         double topBeforeMixer = double.NaN;        // где был плеер до раскрытия микшера (NaN — не запомнено)
         double pendingTop = double.NaN;            // куда вернуть плеер, когда окно уменьшится после сворачивания
@@ -870,7 +870,7 @@ namespace NowPlaying
             };
             card.Children.Add(grip);
 
-            // Меню «⋯»: ползунок размытия фона и кнопка «Закрыть виджет».
+            // Меню «⋯»: три основных действия и отдельный раздел «Управление».
             var menuStack = new StackPanel();
             var blurHeader = new Grid();
             blurHeader.Children.Add(new TextBlock { Text = L.T("Размытие фона", "Background blur"), Foreground = Brushes.White, FontSize = 13, FontWeight = FontWeights.SemiBold });
@@ -891,39 +891,21 @@ namespace NowPlaying
             var statsRow = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 6, 8, 6), Margin = new Thickness(-8, 0, -8, 2), Background = Brushes.Transparent, Cursor = Cursors.Hand };
             var statsContent = new StackPanel { Orientation = Orientation.Horizontal };
             statsContent.Children.Add(Ui.Glyph("", 11, Brushes.White));
-            statsContent.Children.Add(new TextBlock { Text = L.T("Статистика прослушиваний", "Listening stats"), Foreground = Brushes.White, FontSize = 13, Margin = new Thickness(10, 0, 0, 0) });
+            statsContent.Children.Add(new TextBlock { Text = L.T("Статистика прослушивания", "Listening stats"), Foreground = Brushes.White, FontSize = 13, Margin = new Thickness(10, 0, 0, 0) });
             statsRow.Child = statsContent;
             statsRow.MouseEnter += delegate { statsRow.Background = Ui.Hover; };
             statsRow.MouseLeave += delegate { statsRow.Background = Brushes.Transparent; };
             statsRow.MouseLeftButtonDown += (s, e) => e.Handled = true;
             statsRow.MouseLeftButtonUp += (s, e) => { e.Handled = true; menuPanel.Visibility = Visibility.Collapsed; OpenStats(); };
             menuStack.Children.Add(statsRow);
-            // «Скрыть плеер»: на экране остаётся только микшер (кнопка ♪ в нём или значок в трее вернут плеер)
-            var hideRow = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 6, 8, 6), Margin = new Thickness(-8, 0, -8, 2), Background = Brushes.Transparent, Cursor = Cursors.Hand };
-            var hideContent = new StackPanel { Orientation = Orientation.Horizontal };
-            hideContent.Children.Add(Ui.Glyph("", 11, Brushes.White));
-            hideContent.Children.Add(new TextBlock { Text = L.T("Скрыть плеер", "Hide player"), Foreground = Brushes.White, FontSize = 13, Margin = new Thickness(10, 0, 0, 0) });
-            hideRow.Child = hideContent;
-            hideRow.MouseEnter += delegate { hideRow.Background = Ui.Hover; };
-            hideRow.MouseLeave += delegate { hideRow.Background = Brushes.Transparent; };
-            hideRow.MouseLeftButtonDown += (s, e) => e.Handled = true;
-            hideRow.MouseLeftButtonUp += (s, e) =>
-            {
-                e.Handled = true;
-                menuPanel.Visibility = Visibility.Collapsed;
-                sound.KeepMixerVisible();
-                Hide();
-            };
-            menuStack.Children.Add(hideRow);
-
-            // «Настройки»: раскрывающийся раздел — автозапуск и удаление с компьютера
+            // «Управление»: служебные функции вынесены из основных действий.
             var settingsChevron = Ui.Glyph("", 9, Ui.Faint);
-            var settingsRow = MenuRow("", L.T("Настройки", "Settings"), Brushes.White, settingsChevron);
+            var settingsRow = MenuRow("", L.T("Управление", "Management"), Brushes.White, settingsChevron);
             // сам раздел — отдельная карточка справа от меню, в том же «тёмном стекле»
             var settingsBox = new StackPanel();
             var settingsCard = new Border
             {
-                Width = 230, Background = Ui.Brush(0xE61C1C20), BorderBrush = Glass.Edge, BorderThickness = new Thickness(1),
+                Width = 270, Background = Ui.Brush(0xE61C1C20), BorderBrush = Glass.Edge, BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(16), Padding = new Thickness(14, 10, 14, 8), Child = settingsBox
             };
             settingsCard.MouseLeftButtonDown += (s, e) => e.Handled = true;
@@ -933,7 +915,7 @@ namespace NowPlaying
                 HorizontalOffset = 22, VerticalOffset = -10, AllowsTransparency = true, StaysOpen = false, Child = settingsCard
             };
             settingsPopup.Closed += delegate { settingsChevron.Text = ""; settingsClosedAt = DateTime.Now; };
-            settingsBox.Children.Add(new TextBlock { Text = L.T("Настройки", "Settings"), Foreground = Ui.Faint, FontSize = 11, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 6) });
+            settingsBox.Children.Add(new TextBlock { Text = L.T("Управление", "Management"), Foreground = Ui.Faint, FontSize = 11, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 6) });
             settingsRow.MouseLeftButtonUp += (s, e) =>
             {
                 e.Handled = true;
@@ -944,9 +926,10 @@ namespace NowPlaying
                 settingsChevron.Text = "";
                 settingsPopup.IsOpen = true;
             };
-            menuStack.Children.Add(settingsRow);
+            var managementRows = new System.Windows.Controls.Primitives.UniformGrid { Columns = 1, Height = 96 };
+            settingsBox.Children.Add(managementRows);
             autoCheck = Ui.Glyph(Autostart.Enabled ? "" : "", 11, Brushes.White);
-            var autoRow = MenuRow("", L.T("Запускать вместе с Windows", "Start with Windows"), Brushes.White, autoCheck);
+            var autoRow = MenuRow("", L.T("Запускать вместе с Windows", "Start with Windows"), Brushes.White, autoCheck);
             autoRow.MouseLeftButtonUp += (s, e) =>
             {
                 e.Handled = true;
@@ -954,23 +937,18 @@ namespace NowPlaying
                 autoCheck.Text = Autostart.Enabled ? "" : "";
                 if (autoItem != null) autoItem.Checked = Autostart.Enabled;
             };
-            settingsBox.Children.Add(autoRow);
+            managementRows.Children.Add(autoRow);
             // «Расширение для SoundCloud»: справа галочка, если подключено, иначе восклицательный знак
             var extMark = Ui.Glyph("", 11, Brushes.White);
             var extRow = MenuRow("", L.T("Расширение для SoundCloud", "SoundCloud extension"), Brushes.White, extMark);
             extRow.MouseLeftButtonUp += (s, e) => { e.Handled = true; settingsPopup.IsOpen = false; menuPanel.Visibility = Visibility.Collapsed; ExtensionGuide.Show(bridge); };
-            settingsBox.Children.Add(extRow);
+            managementRows.Children.Add(extRow);
             settingsCard.IsVisibleChanged += delegate
             {
                 bool on = bridge.Connected;
                 extMark.Text = on ? "" : "";
                 extMark.Foreground = on ? Brushes.White : Ui.Brush(0xFFFFB340);
             };
-            var removeColor = Ui.Brush(0xFFFF453A);
-            var removeRow = MenuRow("", L.T("Удалить с компьютера", "Uninstall"), removeColor, null);
-            removeRow.MouseEnter += delegate { removeRow.Background = Ui.Brush(0x26FF453A); };
-            removeRow.MouseLeftButtonUp += (s, e) => { e.Handled = true; settingsPopup.IsOpen = false; menuPanel.Visibility = Visibility.Collapsed; UninstallApp(); };
-            settingsBox.Children.Add(removeRow);
 
             var closeRow = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 6, 8, 6), Margin = new Thickness(-8, 0, -8, -6), Background = Brushes.Transparent, Cursor = Cursors.Hand };
             var closeContent = new StackPanel { Orientation = Orientation.Horizontal };
@@ -986,25 +964,21 @@ namespace NowPlaying
 
             // «Выйти» — полностью выключает виджет (как «Выход» в трее); красная, как в iOS
             var exitColor = Ui.Brush(0xFFFF453A);
-            var exitRow = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 6, 8, 6), Margin = new Thickness(-8, 0, -8, -6), Background = Brushes.Transparent, Cursor = Cursors.Hand };
-            var exitContent = new StackPanel { Orientation = Orientation.Horizontal };
-            exitContent.Children.Add(Ui.Glyph("", 11, exitColor));
-            exitContent.Children.Add(new TextBlock { Text = L.T("Выйти", "Quit"), Foreground = exitColor, FontSize = 13, FontWeight = FontWeights.SemiBold, Margin = new Thickness(10, 0, 0, 0) });
-            exitRow.Child = exitContent;
+            var exitRow = MenuRow("", L.T("Выход из приложения", "Quit application"), exitColor, null);
             exitRow.MouseEnter += delegate { exitRow.Background = Ui.Brush(0x26FF453A); };
-            exitRow.MouseLeave += delegate { exitRow.Background = Brushes.Transparent; };
-            exitRow.MouseLeftButtonDown += (s, e) => e.Handled = true;
-            exitRow.MouseLeftButtonUp += (s, e) => { e.Handled = true; ExitApp(); };
-            menuStack.Children.Add(exitRow);
+            exitRow.MouseLeftButtonUp += (s, e) => { e.Handled = true; settingsPopup.IsOpen = false; menuPanel.Visibility = Visibility.Collapsed; ExitApp(); };
+            managementRows.Children.Add(exitRow);
+            menuStack.Children.Add(new Border { Height = 1, Background = Ui.ButtonBg, Margin = new Thickness(-14, 4, -14, 6) });
+            menuStack.Children.Add(settingsRow);
             menuPanel = new Border
             {
-                Width = 210, Background = Ui.Brush(0xB01C1C20), BorderBrush = Glass.Edge, BorderThickness = new Thickness(1),   // тёмное стекло
+                Width = 240, Background = Ui.Brush(0xB01C1C20), BorderBrush = Glass.Edge, BorderThickness = new Thickness(1),   // тёмное стекло
                 CornerRadius = new CornerRadius(16), Padding = new Thickness(14, 12, 14, 12),
                 HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
                 Margin = new Thickness(0, 52, 18, 0), Visibility = Visibility.Collapsed, Child = menuStack
             };
             menuPanel.MouseLeftButtonDown += (s, e) => e.Handled = true;   // клик по меню не двигает окно
-            menuPanel.IsVisibleChanged += delegate { if (!menuPanel.IsVisible) settingsPopup.IsOpen = false; };   // меню закрылось — и «Настройки» тоже
+            menuPanel.IsVisibleChanged += delegate { if (!menuPanel.IsVisible) settingsPopup.IsOpen = false; };   // меню закрылось — и «Управление» тоже
             card.Children.Add(menuPanel);
             var root = new Grid { Margin = new Thickness(18) };
             root.Children.Add(shadow);
@@ -1471,13 +1445,48 @@ namespace NowPlaying
         // Строка меню «⋯»: значок, текст и, если нужно, что-то справа (галочка, стрелочка).
         static Border MenuRow(string glyph, string text, Brush color, UIElement right)
         {
-            var row = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 6, 8, 6), Margin = new Thickness(-8, 0, -8, 2), Background = Brushes.Transparent, Cursor = Cursors.Hand };
-            var g = new Grid();
+            var row = new Border { Height = 32, CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 6, 8, 6), Margin = new Thickness(-8, 0, -8, 0), Background = Brushes.Transparent, Cursor = Cursors.Hand };
+            var g = new Grid { VerticalAlignment = VerticalAlignment.Center };
             g.ColumnDefinitions.Add(new ColumnDefinition());
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var left = new StackPanel { Orientation = Orientation.Horizontal };
-            left.Children.Add(Ui.Glyph(glyph, 11, color));
-            left.Children.Add(new TextBlock { Text = text, Foreground = color, FontSize = 13, Margin = new Thickness(10, 0, 0, 0), TextWrapping = TextWrapping.Wrap });
+            var left = new Grid { VerticalAlignment = VerticalAlignment.Center, Height = 18 };
+            left.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(22) });
+            left.ColumnDefinitions.Add(new ColumnDefinition());
+            UIElement icon;
+            if (glyph == "")
+            {
+                icon = new System.Windows.Shapes.Path { Data = Geometry.Parse("M0,0 H5 V5 H0 Z M7,0 H12 V5 H7 Z M0,7 H5 V12 H0 Z M7,7 H12 V12 H7 Z"), Fill = color, Stretch = Stretch.Uniform, Width = 12, Height = 12, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+            }
+            else if (glyph == "")
+            {
+                var outline = new StreamGeometry();
+                using (var ctx = outline.Open())
+                    for (int i = 0; i < 32; i++)
+                    {
+                        double angle = (i * 11.25 - 95.625) * Math.PI / 180;
+                        double radius = i % 4 == 1 || i % 4 == 2 ? 6 : 4.8;
+                        var point = new Point(6 + radius * Math.Cos(angle), 6 + radius * Math.Sin(angle));
+                        if (i == 0) ctx.BeginFigure(point, true, true);
+                        else ctx.LineTo(point, true, false);
+                    }
+                var gear = new GeometryGroup { FillRule = FillRule.EvenOdd };
+                gear.Children.Add(outline);
+                gear.Children.Add(new EllipseGeometry(new Point(6, 6), 2.2, 2.2));
+                gear.Freeze();
+                icon = new System.Windows.Shapes.Path { Data = gear, Fill = color, Stretch = Stretch.Uniform, Width = 12, Height = 12, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+            }
+            else if (glyph == "" || glyph == "")
+            {
+                // Векторные значки центрируются по рисунку, без шрифтовых отступов.
+                string shape = glyph == "" ? "M6,1 L6,5 M3.2,2.6 A4.3,4.3 0 1 0 8.8,2.6" : "M1,1 L4,1 C3,-2 8,-2 7,1 L10,1 L10,4 C13,3 13,8 10,7 L10,10 L7,10 C8,7 3,7 4,10 L1,10 Z";
+                icon = new System.Windows.Shapes.Path { Data = Geometry.Parse(shape), Stroke = color, StrokeThickness = 1.15, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round, Stretch = Stretch.Uniform, Width = 11, Height = 11, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+            }
+            else
+                icon = new TextBlock { Text = glyph, FontFamily = Ui.Icons, Foreground = color, FontSize = 11, Width = 12, Height = 18, VerticalAlignment = VerticalAlignment.Center };
+            left.Children.Add(icon);
+            var label = new TextBlock { Text = text, Foreground = color, FontSize = 13, Height = 18, LineHeight = 18, LineStackingStrategy = LineStackingStrategy.BlockLineHeight, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(label, 1);
+            left.Children.Add(label);
             g.Children.Add(left);
             if (right != null)
             {
@@ -1531,15 +1540,6 @@ namespace NowPlaying
         void MarkGuideOffered()
         {
             try { using (var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(SettingsKey)) k.SetValue("ExtensionGuideOffered", "1"); } catch { }
-        }
-
-        // «Удалить с компьютера»: запускаем программу удаления из установщика, у неё своё окно с подтверждением.
-        void UninstallApp()
-        {
-            var uninstaller = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Uninstall.exe");
-            if (File.Exists(uninstaller)) { Process.Start(uninstaller, "--uninstall"); return; }
-            MessageBox.Show(L.T("Программа удаления не найдена. Удалить «Сейчас играет» можно в «Параметры → Приложения → Установленные приложения».",
-                                "The uninstaller was not found. You can remove Now Playing in Settings → Apps → Installed apps."), L.T("Сейчас играет", "Now Playing"));
         }
 
         void ToggleMenu()
